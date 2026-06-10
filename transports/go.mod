@@ -12,10 +12,10 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/klauspost/compress v1.18.6
 	github.com/mark3labs/mcp-go v0.43.2
-	github.com/maximhq/bifrost/core v1.5.18
-	github.com/maximhq/bifrost/framework v1.3.18
+	github.com/maximhq/bifrost/core v1.5.19
+	github.com/maximhq/bifrost/framework v1.3.19
 	github.com/maximhq/bifrost/plugins/compat v0.1.17
-	github.com/maximhq/bifrost/plugins/governance v1.5.18
+	github.com/maximhq/bifrost/plugins/governance v1.5.19
 	github.com/maximhq/bifrost/plugins/logging v1.5.18
 	github.com/maximhq/bifrost/plugins/maxim v1.6.18
 	github.com/maximhq/bifrost/plugins/modelcatalogresolver v0.0.0-20260531215024-856c9963e662
@@ -55,12 +55,12 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.55.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
-	github.com/aws/aws-sdk-go-v2 v1.41.12 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.42.0 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.32.11 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.14 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.21 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.28 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.28 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.29 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.29 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.5 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.22 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.7 // indirect
