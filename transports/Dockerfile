@@ -11,7 +11,10 @@
 
   # Copy UI package files and install dependencies
   COPY ui/package*.json ./
-  RUN npm ci
+  # VIRTU: use the internal npm mirror (no external proxy/cert needed) for npm ci.
+  RUN npm config set registry http://artifacts.virtu.com/artifactory/api/npm/kcg-npm/ && \
+    npm config set strict-ssl false && \
+    npm ci
   
   # Copy UI source code
   COPY ui/ ./
@@ -46,6 +49,8 @@
 
   # Download all workspace module deps (resolved through go.work)
   ENV GOWORK=/app/go.work
+  # VIRTU: direct fallback for module versions the public proxy lacks; sumdb off (corp proxy MITM).
+  ENV GOPROXY=https://proxy.golang.org,direct GOSUMDB=off
   RUN go mod download
 
   COPY --from=ui-builder /app/out ./transports/bifrost-http/ui
