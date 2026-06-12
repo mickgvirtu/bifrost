@@ -26,21 +26,25 @@
   
   # Set environment for CGO-enabled build (required for go-sqlite3)
   ENV CGO_ENABLED=1 GOOS=linux
-  
-  COPY transports/go.mod transports/go.sum ./
-  RUN ls
-  RUN cat go.mod
+
+  # VIRTU FORK: build the LOCAL patched core/framework/plugins via the workspace, instead of
+  # pulling published core/framework from the module proxy. Upstream copied only transports/ and
+  # set GOWORK=off, which would silently drop our patches in core/ and framework/.
+  COPY go.work go.work.sum* ./
+  COPY core/ ./core/
+  COPY framework/ ./framework/
+  COPY plugins/ ./plugins/
+  COPY transports/ ./transports/
+
+  # Download all workspace module deps (resolved through go.work)
+  ENV GOWORK=/app/go.work
   RUN go mod download
-  
-  # Copy source code and dependencies
-  COPY transports/ ./
-  
-  COPY --from=ui-builder /app/out ./bifrost-http/ui
-  
+
+  COPY --from=ui-builder /app/out ./transports/bifrost-http/ui
+
   # Build the binary with CGO enabled and static SQLite linking
-  ENV GOWORK=off
   ARG VERSION=unknown
-  RUN go build \
+  RUN cd transports && go build \
     -ldflags="-w -s -X main.Version=v${VERSION} -extldflags '-static'" \
     -a -trimpath \
     -tags "sqlite_static" \

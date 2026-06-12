@@ -64,6 +64,5 @@ tmp/
 temp/
 .tmp/
 
-# Go workspaces (local only)
-go.work
-go.work.sum
+# Go workspaces — VIRTU FORK needs go.work in the build context so the image compiles the
+# local patched core/framework instead of pulling published modules. (Upstream excluded these.)
