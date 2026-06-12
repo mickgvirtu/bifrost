@@ -2,6 +2,10 @@
   FROM node:25-alpine3.23@sha256:bdf2cca6fe3dabd014ea60163eca3f0f7015fbd5c7ee1b0e9ccb4ced6eb02ef4 AS ui-builder
   WORKDIR /app
 
+  # VIRTU: trust the corporate proxy's CA so apk/npm over the TLS-intercepting proxy work.
+  COPY transports/virtu-ca.pem /usr/local/share/ca-certificates/virtu-ca.crt
+  RUN cat /usr/local/share/ca-certificates/virtu-ca.crt >> /etc/ssl/certs/ca-certificates.crt
+
   # Apply latest alpine security patches before installing packages
   RUN apk upgrade --no-cache
 
@@ -19,7 +23,11 @@
   # --- Go Build Stage: Compile the Go binary ---
   FROM golang:1.26.4-alpine3.23@sha256:f23e8b227fb4493eabe03bede4d5a32d04092da71962f1fb79b5f7d1e6c2a17f AS builder
   WORKDIR /app
-  
+
+  # VIRTU: trust the corporate proxy's CA (apk + go module fetches over the TLS-intercepting proxy).
+  COPY transports/virtu-ca.pem /usr/local/share/ca-certificates/virtu-ca.crt
+  RUN cat /usr/local/share/ca-certificates/virtu-ca.crt >> /etc/ssl/certs/ca-certificates.crt
+
   # Install dependencies including gcc for CGO and sqlite (with latest security patches)
   RUN apk upgrade --no-cache && \
     apk add --no-cache gcc musl-dev sqlite-dev binutils binutils-gold
@@ -57,7 +65,11 @@
   # --- Runtime Stage: Minimal runtime image ---
   FROM alpine:3.23.4@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
   WORKDIR /app
-  
+
+  # VIRTU: trust the corporate proxy's CA so apk works over the TLS-intercepting proxy.
+  COPY transports/virtu-ca.pem /usr/local/share/ca-certificates/virtu-ca.crt
+  RUN cat /usr/local/share/ca-certificates/virtu-ca.crt >> /etc/ssl/certs/ca-certificates.crt
+
   # Install runtime dependencies for CGO-enabled binary
   # musl: C standard library (required for CGO binaries)
   # libgcc: GCC runtime library
