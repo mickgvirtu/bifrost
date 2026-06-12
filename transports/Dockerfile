@@ -49,9 +49,14 @@
 
   # Download all workspace module deps (resolved through go.work)
   ENV GOWORK=/app/go.work
-  # VIRTU: direct fallback for module versions the public proxy lacks; sumdb off (corp proxy MITM).
-  ENV GOPROXY=https://proxy.golang.org,direct GOSUMDB=off
-  RUN go mod download
+  # VIRTU: the corporate proxy times out bulk-fetching the hundreds of workspace modules
+  # (http2 GOAWAY session_timed_out). Serve them from a warmed host module cache bind-mounted
+  # as a file:// GOPROXY (the `gomodcache` build context = host GOMODCACHE), with the public
+  # proxy + direct as fallback for anything the cache lacks. sumdb off (corp proxy MITM).
+  ENV GOSUMDB=off
+  RUN --mount=type=bind,from=gomodcache,target=/gomodcache,readonly \
+    GOPROXY="file:///gomodcache/cache/download,https://proxy.golang.org,direct" \
+    go mod download
 
   COPY --from=ui-builder /app/out ./transports/bifrost-http/ui
 
@@ -84,7 +89,9 @@
   
   # Create data directory and set up user
   COPY --from=builder /app/main .
-  COPY --from=builder /app/docker-entrypoint.sh .
+  # VIRTU FORK: build context is the repo root (not transports/), so the entrypoint lands at
+  # /app/transports/ in the builder, not /app/.
+  COPY --from=builder /app/transports/docker-entrypoint.sh .
   
   # Getting arguments
   ARG ARG_APP_PORT=8080
