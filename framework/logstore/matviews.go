@@ -1635,8 +1635,15 @@ func (s *RDBLogStore) getModelRankingsFromMatView(ctx context.Context, filters S
 	var prevResults []prevRow
 	if filters.StartTime != nil && filters.EndTime != nil {
 		duration := filters.EndTime.Sub(*filters.StartTime)
-		prevStart := filters.StartTime.Add(-duration)
-		prevEnd := filters.StartTime.Add(-time.Nanosecond)
+		// Anchor the previous period to the hour grid: the current period's
+		// hour >= date_trunc('hour', StartTime) predicate claims the bucket
+		// containing StartTime, so the previous period must end strictly
+		// before that bucket. Ending at StartTime-1ns would match that same
+		// bucket via hour <= prevEnd and count the boundary hour in both
+		// periods, skewing every trend percentage.
+		hourStart := filters.StartTime.Truncate(time.Hour)
+		prevStart := hourStart.Add(-duration)
+		prevEnd := hourStart.Add(-time.Nanosecond)
 		prevFilters := filters
 		prevFilters.StartTime = &prevStart
 		prevFilters.EndTime = &prevEnd
@@ -1725,8 +1732,15 @@ func (s *RDBLogStore) getUserRankingsFromMatView(ctx context.Context, filters Se
 	var prevResults []prevRow
 	if filters.StartTime != nil && filters.EndTime != nil {
 		duration := filters.EndTime.Sub(*filters.StartTime)
-		prevStart := filters.StartTime.Add(-duration)
-		prevEnd := filters.StartTime.Add(-time.Nanosecond)
+		// Anchor the previous period to the hour grid: the current period's
+		// hour >= date_trunc('hour', StartTime) predicate claims the bucket
+		// containing StartTime, so the previous period must end strictly
+		// before that bucket. Ending at StartTime-1ns would match that same
+		// bucket via hour <= prevEnd and count the boundary hour in both
+		// periods, skewing every trend percentage.
+		hourStart := filters.StartTime.Truncate(time.Hour)
+		prevStart := hourStart.Add(-duration)
+		prevEnd := hourStart.Add(-time.Nanosecond)
 		prevFilters := filters
 		prevFilters.StartTime = &prevStart
 		prevFilters.EndTime = &prevEnd
@@ -1827,8 +1841,15 @@ func (s *RDBLogStore) getDimensionRankingsFromMatView(ctx context.Context, filte
 	var prevResults []row
 	if filters.StartTime != nil && filters.EndTime != nil {
 		duration := filters.EndTime.Sub(*filters.StartTime)
-		prevStart := filters.StartTime.Add(-duration)
-		prevEnd := filters.StartTime.Add(-time.Nanosecond)
+		// Anchor the previous period to the hour grid: the current period's
+		// hour >= date_trunc('hour', StartTime) predicate claims the bucket
+		// containing StartTime, so the previous period must end strictly
+		// before that bucket. Ending at StartTime-1ns would match that same
+		// bucket via hour <= prevEnd and count the boundary hour in both
+		// periods, skewing every trend percentage.
+		hourStart := filters.StartTime.Truncate(time.Hour)
+		prevStart := hourStart.Add(-duration)
+		prevEnd := hourStart.Add(-time.Nanosecond)
 		prevFilters := filters
 		prevFilters.StartTime = &prevStart
 		prevFilters.EndTime = &prevEnd
