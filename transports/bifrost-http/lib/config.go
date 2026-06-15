@@ -721,7 +721,14 @@ func registerFeatureFlags(_ context.Context) error {
 func LoadConfig(ctx context.Context, configDirPath string) (*Config, error) {
 	configFilePath := filepath.Join(configDirPath, "config.json")
 	configDBPath := filepath.Join(configDirPath, "config.db")
-	logsDBPath := filepath.Join(configDirPath, "logs.db")
+	// VIRTU FORK: by default logs.db is a sibling of config.db, which forces config and the
+	// (large, churning) request-log DB onto the same mount. BIFROST_LOGS_DIR puts logs.db in a
+	// separate directory so the two can be bind-mounted independently in the Docker deploy.
+	logsDir := configDirPath
+	if d := os.Getenv("BIFROST_LOGS_DIR"); d != "" {
+		logsDir = d
+	}
+	logsDBPath := filepath.Join(logsDir, "logs.db")
 	// Initialize config
 	config := &Config{
 		configPath: configFilePath,
@@ -912,6 +919,18 @@ func initStores(ctx context.Context, config *Config, configData *ConfigData, con
 			logStoreConfig, dbErr = config.ConfigStore.GetLogsStoreConfig(ctx)
 			if dbErr != nil {
 				return fmt.Errorf("failed to get logs store config: %w", dbErr)
+			}
+		}
+		// VIRTU FORK: when BIFROST_LOGS_DIR is set, force the SQLite logs.db path to it even if the
+		// config.db carries a stored path from an earlier layout (e.g. a DB cloned from a build where
+		// logs.db lived next to config.db). Without this the stored path wins and the relocation is
+		// silently ignored. logsDBPath already honors BIFROST_LOGS_DIR (see LoadConfig).
+		if os.Getenv("BIFROST_LOGS_DIR") != "" {
+			if logStoreConfig != nil && logStoreConfig.Type == logstore.LogStoreTypeSQLite {
+				if sqliteConfig, ok := logStoreConfig.Config.(*logstore.SQLiteConfig); ok && sqliteConfig.Path != logsDBPath {
+					logger.Info("BIFROST_LOGS_DIR override: relocating logs.db from stored path %s to %s", sqliteConfig.Path, logsDBPath)
+					sqliteConfig.Path = logsDBPath
+				}
 			}
 		}
 		if logStoreConfig == nil {
