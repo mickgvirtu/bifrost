@@ -2,40 +2,22 @@
 set -e
 
 APP_DIR=${APP_DIR:-/app/data}
+RUN_USER=appuser
 
-# Function to fix permissions on mounted volumes
+# VIRTU FORK: the container starts as root so it can adopt bind-mounted volumes (which arrive
+# owned by an arbitrary host UID). Chown every persistent dir bifrost writes to — APP_DIR and the
+# separate BIFROST_LOGS_DIR mount — to appuser, then su-exec down to appuser to run the server.
+# Without this, host-owned mounts are unwritable by appuser (logstore init -> permission denied).
 fix_permissions() {
-    # Ensure runtime APP_DIR overrides exist before ownership checks
-    mkdir -p "$APP_DIR" 2>/dev/null || true
-
-    # Check if APP_DIR exists and fix ownership if needed
-    if [ -d "$APP_DIR" ]; then
-        # Get current user info
-        CURRENT_UID=$(id -u)
-        CURRENT_GID=$(id -g)
-        
-        # Get directory ownership
-        DATA_UID=$(stat -c '%u' "$APP_DIR" 2>/dev/null || echo "0")
-        DATA_GID=$(stat -c '%g' "$APP_DIR" 2>/dev/null || echo "0")
-        
-        # If ownership doesn't match current user, try to fix it
-        if [ "$DATA_UID" != "$CURRENT_UID" ] || [ "$DATA_GID" != "$CURRENT_GID" ]; then
-            echo "Fixing permissions on $APP_DIR (was $DATA_UID:$DATA_GID, setting to $CURRENT_UID:$CURRENT_GID)"
-            
-            # Try to change ownership (will work if running as root or if user has permission)
-            if chown -R "$CURRENT_UID:$CURRENT_GID" "$APP_DIR" 2>/dev/null; then
-                echo "Successfully updated permissions on $APP_DIR"
-            else
-                echo "Warning: Could not change ownership of $APP_DIR. You may need to run:"
-                echo "  docker run --user \$(id -u):\$(id -g) ..."
-                echo "  or ensure the host directory is owned by UID:GID $CURRENT_UID:$CURRENT_GID"
-            fi
-        fi
-        
-        # Ensure logs subdirectory exists with correct permissions
-        mkdir -p "$APP_DIR/logs"
-        chmod 755 "$APP_DIR/logs" 2>/dev/null || true
-    fi
+    for d in "$APP_DIR" "$BIFROST_LOGS_DIR"; do
+        [ -n "$d" ] || continue
+        mkdir -p "$d"
+        chown -R "$RUN_USER:$RUN_USER" "$d" 2>/dev/null \
+            || echo "Warning: could not chown $d (run the container as root, or pre-chown the host dir)"
+    done
+    # When BIFROST_LOGS_DIR is unset, rotating logs live under APP_DIR/logs.
+    mkdir -p "$APP_DIR/logs"
+    chown -R "$RUN_USER:$RUN_USER" "$APP_DIR/logs" 2>/dev/null || true
 }
 
 # Fix permissions before starting the application
@@ -77,5 +59,10 @@ if [ $# -gt 1 ]; then
     parse_args "$@"
 fi
 
-# Build the command with environment variables and standard arguments
-exec /app/main -app-dir "$APP_DIR" -port "$APP_PORT" -host "$APP_HOST" -log-level "$LOG_LEVEL" -log-style "$LOG_STYLE"
+# Build the command with environment variables and standard arguments. Drop to appuser via
+# su-exec when running as root (after the chowns above); if already non-root, exec directly.
+set -- /app/main -app-dir "$APP_DIR" -port "$APP_PORT" -host "$APP_HOST" -log-level "$LOG_LEVEL" -log-style "$LOG_STYLE"
+if [ "$(id -u)" = "0" ]; then
+    exec su-exec "$RUN_USER" "$@"
+fi
+exec "$@"
