@@ -84,8 +84,9 @@
   # musl: C standard library (required for CGO binaries)
   # libgcc: GCC runtime library
   # ca-certificates: For HTTPS connections
+  # su-exec: drop from root to appuser in the entrypoint after fixing mount ownership
   RUN apk upgrade --no-cache && \
-    apk add --no-cache musl libgcc ca-certificates zlib
+    apk add --no-cache musl libgcc ca-certificates zlib su-exec
   
   # Create data directory and set up user
   COPY --from=builder /app/main .
@@ -123,7 +124,9 @@
     chown -R appuser:appuser /app && \
     { [ "$APP_DIR" = "/app" ] || [ "${APP_DIR#/app/}" != "$APP_DIR" ] || chown -R appuser:appuser "$APP_DIR"; } && \
     chmod +x /app/docker-entrypoint.sh
-  USER appuser
+  # VIRTU FORK: stay root so the entrypoint can chown bind-mounted volumes (APP_DIR + the separate
+  # BIFROST_LOGS_DIR) to appuser at startup, then it su-exec's down to appuser to run the server.
+  # Without this, host-owned mounts are unwritable by appuser (logstore init -> permission denied).
   
   
   # Declare volume for data persistence
