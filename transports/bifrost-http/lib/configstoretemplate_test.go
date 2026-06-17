@@ -61,7 +61,7 @@ func buildTemplateConfigDB() {
 	// Deliberately no config.json: the template must hold exactly what a default
 	// boot produces and nothing else, or tests asserting fresh-start defaults
 	// would read whatever config the template was built from instead.
-	config, err := LoadConfig(ctx, dir)
+	config, err := LoadConfig(ctx, dir, "")
 	if err != nil {
 		templateConfigDBErr = err
 		return
