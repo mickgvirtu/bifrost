@@ -19991,7 +19991,6 @@ func TestLoadPlugins_OtelPluginSpanFilterPassthrough(t *testing.T) {
 	require.ElementsMatch(t, []any{"logging", "compat"}, plugins)
 }
 
-<<<<<<< HEAD
 func testMemoryEndpoint(id, name string) *configstoreTables.TableWebhookEndpoint {
 	return &configstoreTables.TableWebhookEndpoint{
 		ID:     id,
