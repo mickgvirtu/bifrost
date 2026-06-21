@@ -2390,18 +2390,20 @@ func TestSupportsMidConversationSystem(t *testing.T) {
 		// Not supported off the Anthropic provider, even for Fable.
 		{schemas.Bedrock, "claude-fable-5", false},
 		{schemas.Vertex, "claude-fable-5", false},
-		// Supported: GLM, served via a custom anthropic-base provider whose
-		// provider key is NOT schemas.Anthropic. Gated by model name only, so
-		// it holds under the custom key and under schemas.Anthropic alike. GLM
-		// renders role:"system" inline at any position, so keeping Claude Code's
-		// per-turn reminders inline (not hoisted into the leading system block)
-		// preserves the sglang radix prefix cache.
+		// Supported: any CUSTOM provider key (not a built-in provider) reaching
+		// the Anthropic converter -- it exists only because the operator chose an
+		// Anthropic-compatible base for a self-hosted engine (sglang/vLLM/TGI),
+		// which renders role:"system" inline. Holds regardless of model name, so
+		// it covers GLM, Kimi, and any other self-hosted Anthropic-compatible
+		// model. Keeping the reminder inline preserves the engine's prefix cache.
 		{schemas.ModelProvider("amd_qre_001"), "glm-5", true},
 		{schemas.ModelProvider("amd_qre_001"), "GLM-5", true},
-		{schemas.Anthropic, "glm-5", true},
-		{schemas.ModelProvider("some-custom-key"), "glm-4.6", true},
-		// Not GLM: a non-glm model under a custom provider key stays false.
-		{schemas.ModelProvider("amd_qre_001"), "claude-opus-4-7", false},
+		{schemas.ModelProvider("virtuaireason"), "Kimi-K2.7-Code", true},
+		{schemas.ModelProvider("some-custom-key"), "qwen3-coder", true},
+		// Built-in non-Anthropic providers stay on historical behavior even for
+		// a self-hosted model name (their keys are standard).
+		{schemas.SGL, "glm-5", false},
+		{schemas.OpenAI, "glm-5", false},
 		// Defensive cases.
 		{schemas.Anthropic, "", false},
 		{"", "claude-opus-4-8", false},
