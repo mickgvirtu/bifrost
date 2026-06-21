@@ -839,23 +839,6 @@ func IsFableFamily(model string) bool {
 func IsSonnet5Plus(model string) bool {
 	return strings.Contains(strings.ToLower(model), "sonnet-5")
 }
-
-// IsGLMModel reports whether the model is a GLM model (e.g. "glm-5") served
-// through Bifrost's Anthropic-compatible request path. GLM runs on an sglang
-// engine behind a custom anthropic-base provider (e.g. provider key
-// "amd_qre_001"), not the native Anthropic API, so the check is by model name
-// only -- the custom provider key is not schemas.Anthropic.
-//
-// GLM's chat template renders role:"system" entries inline at any position in
-// the conversation, so GLM supports mid-conversation system messages (see
-// SupportsMidConversationSystem). Keeping Claude Code's per-turn reminders
-// inline at the end -- instead of hoisting them into the leading system block --
-// preserves the sglang radix prefix cache, which the hoist otherwise forks
-// every turn.
-func IsGLMModel(model string) bool {
-	return strings.Contains(strings.ToLower(model), "glm")
-}
-
 // IsAdaptiveOnlyThinkingModel returns true for models where budget_tokens
 // extended thinking is removed (adaptive is the only thinking-on mode) and
 // temperature/top_p/top_k are rejected with a 400. Covers Opus 4.7+, Sonnet 5+,
@@ -937,30 +920,34 @@ func appendToSystemContent(existing *AnthropicContent, newContent AnthropicConte
 
 // SupportsMidConversationSystem returns true if the provider+model combination
 // supports role:"system" entries inside the messages array (mid-conversation
-// system messages). Available on the Anthropic API only — not on Bedrock or
-// Vertex. Supported on Claude Opus 4.8+ and the Claude Fable/Mythos family
-// (Fable post-dates Opus 4.8; the public doc lists Opus 4.8 but Fable supports
-// it as well). No beta header is required.
+// system messages). On Bifrost's built-in providers this is an Anthropic-API
+// feature only (not Bedrock or Vertex), supported on Claude Opus 4.8+ and the
+// Claude Fable/Mythos family (Fable post-dates Opus 4.8; the public doc lists
+// Opus 4.8 but Fable supports it as well). No beta header is required.
 //
-// Also enabled for GLM (e.g. "glm-5"), which is served through a custom
-// anthropic-base provider (its provider key is not schemas.Anthropic, so the
-// check is by model name, provider-agnostic). GLM's chat template renders
-// role:"system" inline at any position, and keeping Claude Code's per-turn
-// reminders inline at the end -- rather than hoisting them into the leading
-// system block -- keeps the sglang radix prefix cache contiguous instead of
-// forking it every turn.
+// It is also enabled for any CUSTOM provider (a provider key that is not one of
+// Bifrost's built-in providers) reaching this Anthropic converter. Such a
+// provider exists only because the operator set base_provider_type to an
+// Anthropic-compatible base and pointed it at a self-hosted engine (sglang,
+// vLLM, TGI, llama.cpp, ...). Those engines are prefix/radix KV-cache based and
+// render role:"system" inline at any position via their chat template, so
+// keeping Claude Code's per-turn reminders inline -- rather than hoisting them
+// into the leading system block -- keeps the prefix cache contiguous instead of
+// forking it every turn. Built-in non-Anthropic providers (Bedrock, Vertex,
+// Azure, ...) are unaffected: their keys are standard, so they fall through to
+// the model-based gate below and keep their historical behavior.
 //
 // Source: https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages
 func SupportsMidConversationSystem(provider schemas.ModelProvider, model string) bool {
-	m := strings.ToLower(model)
-	// GLM is served via a custom anthropic-base provider, so it is gated by
-	// model name regardless of the (custom) provider key.
-	if IsGLMModel(m) {
+	// Custom provider reaching the Anthropic converter => operator chose an
+	// Anthropic-compatible base for a self-hosted engine; assume inline support.
+	if provider != "" && !schemas.IsStandardProvider(provider) {
 		return true
 	}
 	if provider != schemas.Anthropic {
 		return false
 	}
+	m := strings.ToLower(model)
 	if IsFableFamily(m) {
 		return true
 	}
