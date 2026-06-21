@@ -840,6 +840,22 @@ func IsSonnet5Plus(model string) bool {
 	return strings.Contains(strings.ToLower(model), "sonnet-5")
 }
 
+// IsGLMModel reports whether the model is a GLM model (e.g. "glm-5") served
+// through Bifrost's Anthropic-compatible request path. GLM runs on an sglang
+// engine behind a custom anthropic-base provider (e.g. provider key
+// "amd_qre_001"), not the native Anthropic API, so the check is by model name
+// only -- the custom provider key is not schemas.Anthropic.
+//
+// GLM's chat template renders role:"system" entries inline at any position in
+// the conversation, so GLM supports mid-conversation system messages (see
+// SupportsMidConversationSystem). Keeping Claude Code's per-turn reminders
+// inline at the end -- instead of hoisting them into the leading system block --
+// preserves the sglang radix prefix cache, which the hoist otherwise forks
+// every turn.
+func IsGLMModel(model string) bool {
+	return strings.Contains(strings.ToLower(model), "glm")
+}
+
 // IsAdaptiveOnlyThinkingModel returns true for models where budget_tokens
 // extended thinking is removed (adaptive is the only thinking-on mode) and
 // temperature/top_p/top_k are rejected with a 400. Covers Opus 4.7+, Sonnet 5+,
@@ -926,12 +942,25 @@ func appendToSystemContent(existing *AnthropicContent, newContent AnthropicConte
 // (Fable post-dates Opus 4.8; the public doc lists Opus 4.8 but Fable supports
 // it as well). No beta header is required.
 //
+// Also enabled for GLM (e.g. "glm-5"), which is served through a custom
+// anthropic-base provider (its provider key is not schemas.Anthropic, so the
+// check is by model name, provider-agnostic). GLM's chat template renders
+// role:"system" inline at any position, and keeping Claude Code's per-turn
+// reminders inline at the end -- rather than hoisting them into the leading
+// system block -- keeps the sglang radix prefix cache contiguous instead of
+// forking it every turn.
+//
 // Source: https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages
 func SupportsMidConversationSystem(provider schemas.ModelProvider, model string) bool {
+	m := strings.ToLower(model)
+	// GLM is served via a custom anthropic-base provider, so it is gated by
+	// model name regardless of the (custom) provider key.
+	if IsGLMModel(m) {
+		return true
+	}
 	if provider != schemas.Anthropic {
 		return false
 	}
-	m := strings.ToLower(model)
 	if IsFableFamily(m) {
 		return true
 	}
