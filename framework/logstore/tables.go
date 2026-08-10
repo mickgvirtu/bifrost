@@ -1727,7 +1727,13 @@ func (l *Log) BuildContentSummary() string {
 		parts = append(parts, l.ErrorDetailsParsed.Error.Message)
 	}
 
-	return strings.Join(parts, " ")
+	// The concatenated text can carry a NUL through from the request (e.g. a
+	// memory/context file with a raw NUL byte is sent to the model), and every
+	// caller writes the result to the ContentSummary text column, which Postgres
+	// rejects a NUL from (22021). responses_input_history already gets its NUL
+	// content stripped (sanitizeJSONForJSONB in SerializeFields); this mirrors
+	// that for ContentSummary, which holds the same text without that path.
+	return strings.ReplaceAll(strings.Join(parts, " "), "\x00", "")
 }
 
 // KeyPairResult represents an ID-Name pair returned from DISTINCT queries
