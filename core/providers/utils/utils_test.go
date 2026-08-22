@@ -2340,3 +2340,49 @@ func TestProviderSendsDoneMarkerCustomProviderOptIn(t *testing.T) {
 		t.Error("cleared opt-in must fall back to the built-in provider default")
 	}
 }
+
+func TestSetExtraHeaders_InjectsTraceparentFromContext(t *testing.T) {
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	ctx.SetValue(schemas.BifrostContextKeyTraceID, "0af7651916cd43dd8448eb211c80319c")
+	ctx.SetValue(schemas.BifrostContextKeySpanID, "b7ad6b7169203331")
+
+	req := &fasthttp.Request{}
+	SetExtraHeaders(ctx, req, nil, nil)
+	if got := string(req.Header.Peek("traceparent")); got != "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01" {
+		t.Fatalf("expected injected traceparent, got %q", got)
+	}
+}
+
+func TestSetExtraHeaders_DoesNotClobberExistingTraceparent(t *testing.T) {
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	ctx.SetValue(schemas.BifrostContextKeyTraceID, "0af7651916cd43dd8448eb211c80319c")
+	ctx.SetValue(schemas.BifrostContextKeySpanID, "b7ad6b7169203331")
+
+	req := &fasthttp.Request{}
+	req.Header.Set("traceparent", "00-deadbeefdeadbeefdeadbeefdeadbeef-aaaaaaaaaaaaaaaa-01")
+	SetExtraHeaders(ctx, req, nil, nil)
+	if got := string(req.Header.Peek("traceparent")); got != "00-deadbeefdeadbeefdeadbeefdeadbeef-aaaaaaaaaaaaaaaa-01" {
+		t.Fatalf("caller traceparent must not be clobbered, got %q", got)
+	}
+}
+
+func TestSetExtraHeaders_NoTraceparentWhenIDsMissing(t *testing.T) {
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	// no trace/span IDs set (e.g., a non-traced in-process call)
+	req := &fasthttp.Request{}
+	SetExtraHeaders(ctx, req, nil, nil)
+	if got := string(req.Header.Peek("traceparent")); got != "" {
+		t.Fatalf("expected no traceparent without trace context, got %q", got)
+	}
+}
+
+func TestSetExtraHeaders_NoTraceparentWhenIDsMalformed(t *testing.T) {
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	ctx.SetValue(schemas.BifrostContextKeyTraceID, "not-a-valid-trace-id")
+	ctx.SetValue(schemas.BifrostContextKeySpanID, "b7ad6b7169203331")
+	req := &fasthttp.Request{}
+	SetExtraHeaders(ctx, req, nil, nil)
+	if got := string(req.Header.Peek("traceparent")); got != "" {
+		t.Fatalf("malformed trace ID must not produce a traceparent, got %q", got)
+	}
+}

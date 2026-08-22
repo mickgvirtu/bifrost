@@ -1030,6 +1030,46 @@ func SetExtraHeaders(ctx context.Context, req *fasthttp.Request, extraHeaders ma
 			}
 		}
 	}
+	injectTraceparent(ctx, &req.Header)
+}
+
+// injectTraceparent propagates W3C trace context to the upstream provider so its
+// spans join the Bifrost trace as children of the current llm.call span. A
+// caller-supplied traceparent (x-bf-eh-traceparent) is left in place.
+//
+// Inlined rather than calling framework/tracing.InjectTraceContext to avoid an
+// import cycle: tracing -> modelcatalog -> providers/utils -> tracing.
+func injectTraceparent(ctx context.Context, header *fasthttp.RequestHeader) {
+	if tp := traceparentFromContext(ctx); tp != "" && len(header.Peek("traceparent")) == 0 {
+		header.Set("traceparent", tp)
+	}
+}
+
+// traceparentFromContext returns a W3C traceparent for the current Bifrost
+// trace + llm.call span, or "" if either is missing or malformed. Bifrost's IDs
+// are already 32/16 lowercase hex; we validate rather than reuse the tracing
+// package's normalizer (would be a cycle).
+func traceparentFromContext(ctx context.Context) string {
+	traceID, _ := ctx.Value(schemas.BifrostContextKeyTraceID).(string)
+	spanID, _ := ctx.Value(schemas.BifrostContextKeySpanID).(string)
+	if len(traceID) != 32 || !isAllHex(traceID) || len(spanID) != 16 || !isAllHex(spanID) {
+		return ""
+	}
+	return "00-" + traceID + "-" + spanID + "-01"
+}
+
+// isAllHex reports whether s is non-empty and all lowercase hex.
+func isAllHex(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			return false
+		}
+	}
+	return true
 }
 
 // internalHeaderPrefix marks Bifrost's own request headers (x-bf-vk and friends). They carry
@@ -2051,6 +2091,9 @@ func SetExtraHeadersHTTP(ctx context.Context, req *http.Request, extraHeaders ma
 				}
 			}
 		}
+	}
+	if tp := traceparentFromContext(ctx); tp != "" && req.Header.Get("traceparent") == "" {
+		req.Header.Set("traceparent", tp)
 	}
 }
 
