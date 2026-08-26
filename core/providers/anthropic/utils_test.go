@@ -2752,6 +2752,23 @@ func TestSupportsMidConversationSystem(t *testing.T) {
 		// Defensive cases.
 		{schemas.Anthropic, "", false},
 		{"", "claude-opus-4-8", false},
+
+		// Custom (non-standard) providers: an operator pointed an Anthropic-compatible base at a
+		// self-hosted engine, so inline role:"system" is assumed supported regardless of model
+		// name. Model-family detection cannot cover these — ResolveFamily has no branch for GLM,
+		// Kimi or ds4, so they resolve to the empty family and never match IsAnthropicModelFamily.
+		{"amd_qre_001", "glm-5.2", true},
+		{"b300_3", "glm-5.2", true},
+		{"mi350_2", "moonshotai/Kimi-K3", true},
+		{"ds4_flash", "ds4-dspark", true},
+		{"cdm", "Kimi-K2.7-Code", true},
+		// A custom provider is trusted even for a model name that looks like nothing in
+		// particular — the signal is the provider, not the model.
+		{"my-custom-provider", "some-local-model", true},
+		// Standard providers keep the documented Anthropic-only behaviour and must not be
+		// caught by the custom-provider arm.
+		{schemas.OpenAI, "gpt-4o", false},
+		{schemas.Bedrock, "us.anthropic.claude-opus-5", false},
 	}
 
 	for _, tt := range tests {
