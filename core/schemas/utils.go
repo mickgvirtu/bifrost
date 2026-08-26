@@ -84,6 +84,18 @@ func UnregisterKnownProvider(provider ModelProvider) {
 	delete(knownProviders, string(provider))
 }
 
+// IsStandardProvider reports whether provider is one of Bifrost's built-in providers.
+// Distinct from IsKnownProvider, which also returns true for registered custom providers
+// and so cannot separate a first-party provider from an operator-defined one.
+func IsStandardProvider(provider ModelProvider) bool {
+	for _, p := range StandardProviders {
+		if p == provider {
+			return true
+		}
+	}
+	return false
+}
+
 // IsKnownProvider checks if a provider string is known.
 func IsKnownProvider(provider string) bool {
 	knownProvidersMu.RLock()

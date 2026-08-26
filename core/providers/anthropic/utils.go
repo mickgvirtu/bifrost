@@ -1234,6 +1234,15 @@ func inlineMidConversationSystem(content *AnthropicContent) *AnthropicMessage {
 //
 // Source: https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages
 func DefaultSupportsMidConversationSystem(provider schemas.ModelProvider, model string) bool {
+	// A custom (non-standard) provider reaching this converter means the operator pointed an
+	// Anthropic-compatible base at a self-hosted engine — sglang/vLLM serving GLM, Kimi, etc.
+	// Those templates render role:"system" inline at any position, and hoisting a per-turn
+	// reminder into the leading system block forks the engine's prefix cache every turn.
+	// Model-family detection cannot help here: ResolveFamily has no GLM branch, so glm-5.x
+	// resolves to the empty family and never matches IsAnthropicModelFamily.
+	if provider != "" && !schemas.IsStandardProvider(provider) {
+		return true
+	}
 	if provider != schemas.Anthropic {
 		return false
 	}
